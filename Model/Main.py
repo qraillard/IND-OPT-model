@@ -20,8 +20,8 @@ colors = ["#004776","#b8e1ff","#72c5fe","#2baaff","#f8b740","#005f9e","#000000",
 customPalette = sns.set_palette(sns.color_palette(colors))
 start_overall=time.time()
 for sector in [
-            # "Steel",
-            # "Chemistry",
+            "Steel",
+            "Chemistry",
                "Cement"
                     ]:
     start=time.time()
