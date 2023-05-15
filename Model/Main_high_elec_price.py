@@ -161,6 +161,6 @@ for sector in [
     del model
     del res
 print("\nFinished after "+str(round(time.time()-start_overall,0))+"s")
-exit()
+# exit()
 
 

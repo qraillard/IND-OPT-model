@@ -52,6 +52,7 @@ for sector in [
     a=time.time()
     print("\t\tTECHNOLOGIES Sheet cleaning at "+str(round(a-start,0))+"s")
     df_dict["TECHNOLOGIES"]=technologies_sheet(Parameters_data["TECHNOLOGIES"],tech_list,sector_list,year_list,areas_list)
+    df_dict["TECHNOLOGIES"].to_excel("hi.xlsx")
     print("\t\t\tTECHNOLOGIES Sheet cleaned within "+str(round(time.time()-a,0))+"s")
     a=time.time()
     print("\t\tRESOURCES Sheet cleaning at "+str(round(a-start,0))+"s")
@@ -161,6 +162,6 @@ for sector in [
     del model
     del res
 print("\nFinished after "+str(round(time.time()-start_overall,0))+"s")
-exit()
+# exit()
 
 

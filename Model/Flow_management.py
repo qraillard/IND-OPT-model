@@ -103,6 +103,14 @@ def Flow_management_Ctr(model,t_tt_combinations):
 
     model.Resource_flowCtr = Constraint(model.RESOURCES, model.SECTOR, model.AREAS, model.YEAR, rule=Resource_flow_rule)
 
+    # def Resource_export_2nd_rule(model, resource, sector, area, year):
+    #     if model.P_is_product[resource,sector, area, year] == 0 and resource !="CO2": #CO2 emissions can be captured and thus we can have negative emissions
+    #         return model.V_resource_exports[resource,sector, area, year] == 0
+    #     else:
+    #         return Constraint.Skip
+
+    # model.Resource_export_2ndCtr = Constraint(model.RESOURCES, model.SECTOR, model.AREAS, model.YEAR, rule=Resource_export_2nd_rule)
+
 
     def Technology_Production_Min_rule(model, tech, tech_type, sector, area, year):
         if tech_type in t_tt_combinations[tech]:
@@ -245,14 +253,14 @@ def Flow_management_Ctr(model,t_tt_combinations):
     model.Resource_imports_and_inflowCtr = Constraint(model.RESOURCES, model.SECTOR, model.AREAS, model.YEAR,
                                               rule=Resource_imports_and_inflow_rule)
 
-    def Resource_export_rule(model,resource, sector,area, year):
+    def Resource_export_1st_rule(model,resource, sector,area, year):
         if model.P_export[resource,sector, area, year] != 0:
             return model.P_export[resource,sector, area, year] == model.V_resource_exports[resource,sector, area, year]
         else:
             return Constraint.Skip
 
-    model.Resource_exportCtr = Constraint(model.RESOURCES, model.SECTOR, model.AREAS, model.YEAR,
-                                              rule=Resource_export_rule)
+    model.Resource_export_1stCtr = Constraint(model.RESOURCES, model.SECTOR, model.AREAS, model.YEAR,
+                                              rule=Resource_export_1st_rule)
 
     def Resource_max_import_rule(model,resource,sector,area,year):
         if model.P_no_import[resource,sector,area,year]==1:

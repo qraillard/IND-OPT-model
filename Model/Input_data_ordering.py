@@ -90,6 +90,7 @@ def technologies_sheet(df,tech_list,sector_list,year_list,areas_list):
                                             (tech,sector, area, 0, parameter),
                                             (tech, sector,0, year, parameter),
                                             (tech, sector,0, 0, parameter),
+                                            (tech, 0, area, year, parameter),
                                             (tech, 0,0, year, parameter),
                                             (tech, 0, 0, 0, parameter),
                                             (0,sector,0, year, parameter),
