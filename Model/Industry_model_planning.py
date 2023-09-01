@@ -12,13 +12,14 @@ from Model.Flow_management import *
 from Model.CCS_specific import *
 
 
-def GetIndustryModel(Parameters,t_tt_combinations):
+def GetIndustryModel(Parameters,t_tt_combinations,s_t_combinations,tech_ccs_combinations,sector_tech_ccs_combinations,CCU_negative_emissions=False):
     # model = ConcreteModel()
 
-    model=Create_Sets_Parameters_Variables(Parameters)
-    model=Cost_Emissions_Obj_Ctr(model,t_tt_combinations)
-    model=Capacity_planning(model,t_tt_combinations)
-    model=Flow_management_Ctr(model,t_tt_combinations)
-    model=CCS_specific_Ctr(model,t_tt_combinations)
+    model=Create_Sets_Parameters_Variables(Parameters,t_tt_combinations,s_t_combinations,tech_ccs_combinations,sector_tech_ccs_combinations)
+    model.P_CCU_negative_emissions=CCU_negative_emissions
+    model=Cost_Emissions_Obj_Ctr(model,t_tt_combinations,s_t_combinations)
+    model=Capacity_planning(model,t_tt_combinations,s_t_combinations)
+    model=Flow_management_Ctr(model,t_tt_combinations,s_t_combinations)
+    model=CCS_specific_Ctr(model,t_tt_combinations,s_t_combinations,sector_tech_ccs_combinations)
 
     return model

@@ -7,7 +7,7 @@ import numpy as np
 import re
 import sys
 
-def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
+def Cost_Emissions_Obj_Ctr(model,t_tt_combinations,s_t_combinations):
     ########################
     # Objective Function   #
     ########################
@@ -36,10 +36,10 @@ def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
             model.P_flow_cost_r[resource,sector, area, year] * model.V_resource_imports[resource,sector, area, year]
             for resource in model.RESOURCES) + \
                sum(sum(model.P_flow_cost_t[tech,sector, area, year] * model.V_technology_use_coef[tech, tech_type,sector, area, year] \
-                       for tech_type in t_tt_combinations[tech]) for tech in model.TECHNOLOGIES) + \
-               sum(model.V_technology_cost[tech,sector, area, year] for tech in model.TECHNOLOGIES) + \
+                       for tech_type in t_tt_combinations[tech]) for tech in s_t_combinations[sector]) + \
+               sum(model.V_technology_cost[tech,sector, area, year] for tech in s_t_combinations[sector]) + \
                sum(model.P_opex_cost[tech,sector, area, year] * model.V_technology_use_coef_capacity[tech,sector, area, year] for tech
-                   in model.TECHNOLOGIES) + \
+                   in s_t_combinations[sector]) + \
                model.V_carbon_cost[sector,area,year] + \
                model.V_ccs_capex_cost[sector,area,year] + model.V_ccs_opex_cost[sector,area,year]
 
@@ -52,7 +52,7 @@ def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
             subTot = 0
             tech_exists = False
             for resource in model.RESOURCES:
-                for tech_type in model.TECH_TYPE:
+                for tech_type in t_tt_combinations[tech]:
                     if model.P_conversion_factor[tech, tech_type, sector, resource, y] != 0:
                         tech_exists = True
             if tech_exists:
@@ -70,26 +70,26 @@ def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
 
         return model.V_technology_cost[tech,sector, area, year] == Tot
 
-    model.Technology_cost_definitionCtr = Constraint(model.TECHNOLOGIES, model.SECTOR, model.AREAS, model.YEAR,
+    model.Technology_cost_definitionCtr = Constraint(model.TECHNOLOGIES_SECTOR, model.AREAS, model.YEAR,
                                                      rule=Technology_cost_definition_rule)
 
 
     def Emissions_definition_rule(model,sector, area, year):
         return model.V_emissions[sector,area, year] == sum(sum(
-            model.V_emissions_tech_type[tech, tech_type,sector, area, year] for tech_type in
-            t_tt_combinations[tech])-model.V_captured_emissions[tech,sector,area,year] for tech in model.TECHNOLOGIES) + \
+            model.V_emissions_tech_type_plus[tech, tech_type,sector, area, year] for tech_type in
+            t_tt_combinations[tech])-model.V_captured_emissions[tech,sector,area,year] for tech in s_t_combinations[sector]) + \
                sum(model.P_emissions_r[resource,sector, area, year] * model.V_resource_imports[resource,sector, area, year] for resource
-                   in model.RESOURCES)+model.V_resource_exports["CO",sector,area,year]*1.6 #coef for CO2eq assuming CO oxydation // indeed, if not consumed, CO is released into the atmosphere
-
+                   in model.RESOURCES)+sum(sum(model.V_emissions_tech_type_minus[tech, tech_type,sector, area, year] for tech_type in
+            t_tt_combinations[tech]) for tech in ["Biogas_Digester"])
     model.Emissions_definitionCtr = Constraint(model.SECTOR,model.AREAS, model.YEAR, rule=Emissions_definition_rule)
 
     def Emissions_no_ccs_definition_rule(model,sector, area, year):
         return model.V_emissions_no_ccs[sector,area, year] == sum(sum(
-            model.V_emissions_tech_type[tech, tech_type,sector, area, year] for tech_type in
-            t_tt_combinations[tech]) for tech in model.TECHNOLOGIES) + \
+            model.V_emissions_tech_type_plus[tech, tech_type,sector, area, year] for tech_type in
+            t_tt_combinations[tech]) for tech in s_t_combinations[sector]) + \
                sum(model.P_emissions_r[resource,sector, area, year] * model.V_resource_imports[resource,sector, area, year] for resource
-                   in model.RESOURCES)+model.V_resource_exports["CO",sector,area,year]*1.6 #coef for CO2eq assuming CO oxydation // indeed, if not consumed, CO is released into the atmosphere
-
+                   in model.RESOURCES)+sum(sum(model.V_emissions_tech_type_minus[tech, tech_type,sector, area, year] for tech_type in
+            t_tt_combinations[tech]) for tech in ["Biogas_Digester"])
     model.Emissions_no_ccs_definitionCtr = Constraint(model.SECTOR,model.AREAS, model.YEAR, rule=Emissions_no_ccs_definition_rule)
 
     def Technology_emissions_definition_1st_rule(model, tech, tech_type,sector, area, year):
@@ -99,7 +99,7 @@ def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
         else:
             return Constraint.Skip
 
-    model.Technology_emissions_definition_1stCtr = Constraint(model.TECHNOLOGIES, model.TECH_TYPE, model.SECTOR, model.AREAS,
+    model.Technology_emissions_definition_1stCtr = Constraint(model.TECHNOLOGIES_TECH_TYPE_SECTOR, model.AREAS,
                                                               model.YEAR, rule=Technology_emissions_definition_1st_rule)
 
     def Technology_emissions_definition_2nd_rule(model, tech, tech_type,sector, area, year):
@@ -109,16 +109,28 @@ def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
         else:
             return Constraint.Skip #model.V_emissions_tech_type[tech, tech_type,sector, area, year]==0
 
-    model.Technology_emissions_definition_2ndCtr = Constraint(model.TECHNOLOGIES, model.TECH_TYPE,model.SECTOR, model.AREAS,
+    model.Technology_emissions_definition_2ndCtr = Constraint(model.TECHNOLOGIES_TECH_TYPE_SECTOR, model.AREAS,
                                                               model.YEAR,
                                                               rule=Technology_emissions_definition_2nd_rule)
+    def Technology_emissions_definition_3rd_rule(model, tech, tech_type,sector, area, year):
+        if model.P_conversion_factor[tech, tech_type,sector, "CO2", year]>=0:
+            return model.V_emissions_tech_type_plus[tech, tech_type,sector, area, year] == 0
+        else:
+            return model.V_emissions_tech_type_minus[tech, tech_type,sector, area, year] == 0
 
-    def Technology_emissions_definition_3rd_rule(model, sector, area, year):
-        return sum(sum(model.V_emissions_tech_type[tech, tech_type,sector, area, year] for tech_type in t_tt_combinations[tech]) for tech in model.TECHNOLOGIES)>=0
-
-    model.Technology_emissions_definition_3rdCtr = Constraint(model.SECTOR, model.AREAS,
+    model.Technology_emissions_definition_3rdCtr = Constraint(model.TECHNOLOGIES_TECH_TYPE_SECTOR, model.AREAS,
                                                               model.YEAR,
                                                               rule=Technology_emissions_definition_3rd_rule)
+
+    # def Technology_emissions_definition_3rd_rule(model, sector, area, year):
+    #     return sum(sum(model.V_emissions_tech_type[tech, tech_type,sector, area, year] for tech_type in t_tt_combinations[tech]) for tech in model.TECHNOLOGIES)>=0
+
+    # model.Technology_emissions_definition_3rdCtr = Constraint(model.SECTOR, model.AREAS,
+    #                                                           model.YEAR,
+    #                                                           rule=Technology_emissions_definition_3rd_rule)
+
+
+
 
     def Carbon_cost_rule(model,sector,area,year):
         return model.V_carbon_cost[sector, area, year] == model.P_carbon_tax[sector,area,year]*model.V_ctax_emissions_plus[sector, area, year]
@@ -126,14 +138,25 @@ def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
     model.Carbon_costCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Carbon_cost_rule)
 
     def Ctax_emissions_rule(model,sector,area,year):
-        return model.V_ctax_emissions_plus[sector, area, year]+ model.V_ctax_emissions_minus[sector, area, year] == \
-               sum(sum(
-                   model.V_emissions_tech_type[tech, tech_type, sector, area, year] for tech_type in
-                   t_tt_combinations[tech]) - model.V_captured_emissions[tech, sector, area, year] for tech in
-                   model.TECHNOLOGIES) + \
-               sum(model.P_emissions_r[resource, sector, area, year] * model.V_resource_imports[
-                   resource, sector, area, year] for resource
-                   in model.CTAX_RESOURCES)#+model.V_resource_exports["CO",sector,area,year]*1.6 #todo do I include CO emissions in the equation ?
+        if model.P_CCU_negative_emissions:
+            return model.V_ctax_emissions_plus[sector, area, year]+ model.V_ctax_emissions_minus[sector, area, year] == \
+                   sum(sum(
+                       model.V_emissions_tech_type[tech, tech_type, sector, area, year] for tech_type in
+                       t_tt_combinations[tech]) - model.V_captured_emissions[tech, sector, area, year] for tech in
+                       s_t_combinations[sector]) + \
+                   sum(model.P_emissions_r[resource, sector, area, year] * model.V_resource_imports[
+                       resource, sector, area, year] for resource
+                       in model.CTAX_RESOURCES)
+        else:
+            return model.V_ctax_emissions_plus[sector, area, year] + model.V_ctax_emissions_minus[sector, area, year] == \
+                sum(sum(
+                    model.V_emissions_tech_type_plus[tech, tech_type, sector, area, year] for tech_type in
+                    t_tt_combinations[tech]) - model.V_captured_emissions[tech, sector, area, year] for tech in
+                    s_t_combinations[sector]) + \
+                sum(model.P_emissions_r[resource, sector, area, year] * model.V_resource_imports[
+                    resource, sector, area, year] for resource
+                    in model.CTAX_RESOURCES)+sum(sum(model.V_emissions_tech_type_minus[tech, tech_type,sector, area, year] for tech_type in
+            t_tt_combinations[tech]) for tech in ["Biogas_Digester"])
     model.Ctax_emissionsCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Ctax_emissions_rule)
 
     def Emissions_reduction_rule(model,sector,area,year):
@@ -144,6 +167,15 @@ def Cost_Emissions_Obj_Ctr(model,t_tt_combinations):
             return Constraint.Skip
 
     model.Emissions_reductionCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Emissions_reduction_rule)
+
+    def Emissions_reduction_overall_rule(model,area,year):
+        year_ini=min(getattr(model, "YEAR").data())
+        if model.P_emissions_reduction_ratio_obj["All",area,year]!=0 and year > year_ini:
+            return sum(model.V_emissions[sector,area,year] for sector in model.SECTOR)<=(1-model.P_emissions_reduction_ratio_obj["All",area,year])*sum(model.V_emissions[sector,area,year_ini] for sector in model.SECTOR)
+        else:
+            return Constraint.Skip
+
+    model.Emissions_reduction_overallCtr=Constraint(model.AREAS,model.YEAR,rule=Emissions_reduction_overall_rule)
 
 
     return model
