@@ -171,7 +171,7 @@ else:
 
 
 
-with open('Results/Result files/Results.pickle', 'wb') as f:
+with open('Results/Results.pickle', 'wb') as f:
     pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
     f.close()
 print("\t\t\tExtracted within "+str(round(time.time()-a,0))+"s")
