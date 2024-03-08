@@ -82,7 +82,7 @@ def CCS_specific_Ctr(model,t_tt_combinations,s_t_combinations,sector_tech_ccs_co
             for ys in range(min(getattr(model, "YEAR").data()), year + 1))
     model.ccs_added_removed_capacityCtr=Constraint(model.CCS_TYPE_TECHNOLOGIES_SECTOR,model.AREAS,model.YEAR,rule=ccs_added_removed_capacity_rule)
 
-    #TODO: just added so to verify
+
     def ccs_added_capacity_rule(model,ccs,tech,sector,area,year):
         if model.P_ccs_ratio[ccs,tech,sector,area,year]==0:
             return model.V_ccs_added_capacity[ccs,tech,sector,area, year]==0
