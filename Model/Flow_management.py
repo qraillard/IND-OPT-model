@@ -96,7 +96,7 @@ def Flow_management_Ctr(model,t_tt_combinations,s_t_combinations):
     model.Production_plusCtr = Constraint(model.RESOURCES,model.SECTOR, model.AREAS, model.YEAR, rule=Production_plus_rule)
 
     def Resource_flow_rule(model, resource, sector, area, year):
-        if model.P_is_product[resource,sector, area, year] == 0 and resource not in ["CO2"]: #CO2 emissions can be captured and thus we can have negative emissions
+        if model.P_is_product[resource,sector, area, year] == 0 and resource not in ["CO2","DAC_CO2"]: #CO2 emissions can be captured and thus we can have negative emissions
             return model.V_resource_flow[resource,sector, area, year] >= 0
         else:
             return Constraint.Skip
@@ -462,21 +462,37 @@ def Flow_management_Ctr(model,t_tt_combinations,s_t_combinations):
 
 
 
-    def Max_biogas_rule(model,sector,area,year):
-        tech_list=["Biogas_Digester","Gasification"]
-        if model.P_max_biogas_t["All",area,year]!=0:
+    def Max_biogas_from_digester_rule(model,sector,area,year):
+        tech_list=["Biogas_Digester",]
+        if model.P_max_biogas_from_digester_t["All",area,year]!=0:
             return sum(sum(model.V_resource_tech_type_outflow[tech,tech_type,s,"Gas",area,year]
                        for tech_type in t_tt_combinations[tech]) for tech in tech_list  \
                        for s in model.SECTOR)<= \
-                   model.P_max_biogas_t["All", area, year]
-        elif model.P_max_biogas_t[sector,area,year]!=0:
+                   model.P_max_biogas_from_digester_t["All", area, year]
+        elif model.P_max_biogas_from_digester_t[sector,area,year]!=0:
             return sum(sum(model.V_resource_tech_type_outflow[tech, tech_type, sector,"Gas", area, year]
                         for tech_type in t_tt_combinations[tech]) for tech in tech_list) <= \
-                   model.P_max_biogas_t[sector, area, year]
+                   model.P_max_biogas_from_digester_t[sector, area, year]
         else:
             return Constraint.Skip
 
-    model.Max_biogasCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Max_biogas_rule)
+    model.Max_biogas_from_digesterCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Max_biogas_from_digester_rule)
+
+    def Max_biogas_from_gasification_rule(model,sector,area,year):
+        tech_list=["Gasification"]
+        if model.P_max_biogas_from_gasification_t["All",area,year]!=0:
+            return sum(sum(model.V_resource_tech_type_outflow[tech,tech_type,s,"Gas",area,year]
+                       for tech_type in t_tt_combinations[tech]) for tech in tech_list  \
+                       for s in model.SECTOR)<= \
+                   model.P_max_biogas_from_gasification_t["All", area, year]
+        elif model.P_max_biogas_from_gasification_t[sector,area,year]!=0:
+            return sum(sum(model.V_resource_tech_type_outflow[tech, tech_type, sector,"Gas", area, year]
+                        for tech_type in t_tt_combinations[tech]) for tech in tech_list) <= \
+                   model.P_max_biogas_from_gasification_t[sector, area, year]
+        else:
+            return Constraint.Skip
+
+    model.Max_biogas_from_gasificationCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Max_biogas_from_gasification_rule)
 
     def Min_capacity_factor_rule(model,tech,sector,area,year):
         if model.P_min_capacity_factor[tech,sector,area,year]>0:
@@ -496,54 +512,54 @@ def Flow_management_Ctr(model,t_tt_combinations,s_t_combinations):
     model.Electricity_load_factorCtr=Constraint(model.TECHNOLOGIES_TECH_TYPE_SECTOR,model.AREAS,model.YEAR,rule=Electricity_load_factor_rule)
 
 
-    def Hydrogen_specific_prod_rules(model):
-
-        model.V_h2_prod_required = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
-                                          domain=NonNegativeReals)
-        model.V_h2_no_prod_required = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
-                                       domain=NonNegativeReals)
-        model.V_hpr_non_zero = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
-                                       domain=Binary)
-        model.V_hnpr_non_zero = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
-                                          domain=Binary)
-
-        def Hydrogen_specific_prod_1st_rule(model,sector,area,year):
-            if model.P_is_product["Hydrogen", sector, area, year] == 1:
-                not_dedicated_tech_list = []
-                for tech in s_t_combinations[sector]:
-                    if model.P_capacity_associated_resource[tech, sector, area, year] != "Hydrogen":
-                        not_dedicated_tech_list.append(tech)
-
-                return model.V_h2_prod_required[sector,area,year]-model.V_h2_no_prod_required[sector,area,year]==\
-            model.V_resource_inflow["Hydrogen",sector,area,year]-model.V_resource_imports["Hydrogen",sector,area,year]-sum(model.V_resource_tech_type_outflow[
-                        tech, tech_type,sector, "Hydrogen", area, year] for tech in not_dedicated_tech_list for tech_type in t_tt_combinations[tech])
-            else:
-                return Constraint.Skip
-        model.Hydrogen_specific_prod_1stCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Hydrogen_specific_prod_1st_rule)
-        def Hydrogen_specific_prod_2nd_rule(model,sector,area,year): #Hydrogen by-product surplus is authorized but surplus from dedicated to hydrogen production technologies is forbidden
-            tech_list=[]
-            if model.P_is_product["Hydrogen",sector, area, year]==1:
-                for tech in s_t_combinations[sector]:
-                    if model.P_capacity_associated_resource[tech,sector,area,year]=="Hydrogen":
-                        tech_list.append(tech)
-
-                return model.V_h2_prod_required[sector,area,year]>=sum(model.V_resource_tech_type_outflow[
-                    tech, tech_type,sector, "Hydrogen", area, year] for tech in tech_list for tech_type in t_tt_combinations[tech])
-            else:
-                return Constraint.Skip
-        model.Hydrogen_specific_prod_2ndCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Hydrogen_specific_prod_2nd_rule)
-        def h2_prod_non_zero_rule(model,sector,area,year):
-            return model.V_h2_prod_required[sector,area,year]<=model.V_hpr_non_zero[sector,area,year]*1e12
-        def h2_no_prod_non_zero_rule(model, sector, area, year):
-            return model.V_h2_no_prod_required[sector, area, year] <= model.V_hnpr_non_zero[sector, area, year] * 1e12
-        def h2_prod_no_prod_non_zero_rule(model,sector,area,year):
-            return model.V_hpr_non_zero[sector,area,year]+model.V_hnpr_non_zero[sector,area,year]<=1
-        model.h2_prod_non_zeroCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=h2_prod_non_zero_rule)
-        model.h2_no_prod_non_zeroCtr =Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=h2_no_prod_non_zero_rule)
-        model.h2_prod_no_prod_non_zeroCtr =Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=h2_prod_no_prod_non_zero_rule)
-
-
-        return model
+    # def Hydrogen_specific_prod_rules(model):
+    #
+    #     model.V_h2_prod_required = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
+    #                                       domain=NonNegativeReals)
+    #     model.V_h2_no_prod_required = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
+    #                                    domain=NonNegativeReals)
+    #     model.V_hpr_non_zero = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
+    #                                    domain=Binary)
+    #     model.V_hnpr_non_zero = Var(model.SECTOR, model.AREAS, model.YEAR, initialize=0,
+    #                                       domain=Binary)
+    #
+    #     def Hydrogen_specific_prod_1st_rule(model,sector,area,year):
+    #         if model.P_is_product["Hydrogen", sector, area, year] == 1:
+    #             not_dedicated_tech_list = []
+    #             for tech in s_t_combinations[sector]:
+    #                 if model.P_capacity_associated_resource[tech, sector, area, year] != "Hydrogen":
+    #                     not_dedicated_tech_list.append(tech)
+    #
+    #             return model.V_h2_prod_required[sector,area,year]-model.V_h2_no_prod_required[sector,area,year]==\
+    #         model.V_resource_inflow["Hydrogen",sector,area,year]-model.V_resource_imports["Hydrogen",sector,area,year]-sum(model.V_resource_tech_type_outflow[
+    #                     tech, tech_type,sector, "Hydrogen", area, year] for tech in not_dedicated_tech_list for tech_type in t_tt_combinations[tech])
+    #         else:
+    #             return Constraint.Skip
+    #     model.Hydrogen_specific_prod_1stCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Hydrogen_specific_prod_1st_rule)
+    #     def Hydrogen_specific_prod_2nd_rule(model,sector,area,year): #Hydrogen by-product surplus is authorized but surplus from dedicated to hydrogen production technologies is forbidden
+    #         tech_list=[]
+    #         if model.P_is_product["Hydrogen",sector, area, year]==1:
+    #             for tech in s_t_combinations[sector]:
+    #                 if model.P_capacity_associated_resource[tech,sector,area,year]=="Hydrogen":
+    #                     tech_list.append(tech)
+    #
+    #             return model.V_h2_prod_required[sector,area,year]>=sum(model.V_resource_tech_type_outflow[
+    #                 tech, tech_type,sector, "Hydrogen", area, year] for tech in tech_list for tech_type in t_tt_combinations[tech])
+    #         else:
+    #             return Constraint.Skip
+    #     model.Hydrogen_specific_prod_2ndCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=Hydrogen_specific_prod_2nd_rule)
+    #     def h2_prod_non_zero_rule(model,sector,area,year):
+    #         return model.V_h2_prod_required[sector,area,year]<=model.V_hpr_non_zero[sector,area,year]*1e12
+    #     def h2_no_prod_non_zero_rule(model, sector, area, year):
+    #         return model.V_h2_no_prod_required[sector, area, year] <= model.V_hnpr_non_zero[sector, area, year] * 1e12
+    #     def h2_prod_no_prod_non_zero_rule(model,sector,area,year):
+    #         return model.V_hpr_non_zero[sector,area,year]+model.V_hnpr_non_zero[sector,area,year]<=1
+    #     model.h2_prod_non_zeroCtr=Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=h2_prod_non_zero_rule)
+    #     model.h2_no_prod_non_zeroCtr =Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=h2_no_prod_non_zero_rule)
+    #     model.h2_prod_no_prod_non_zeroCtr =Constraint(model.SECTOR,model.AREAS,model.YEAR,rule=h2_prod_no_prod_non_zero_rule)
+    #
+    #
+    #     return model
     # model=Hydrogen_specific_prod_rules(model)
 
 

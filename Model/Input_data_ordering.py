@@ -93,23 +93,47 @@ def technologies_sheet(df,tech_list,sector_list,year_list,areas_list):
                 for year in year_list:
                     for parameter in parameter_list:
                         value = None
-                        if sector!="All":
+                        if sector!="All" and year<=2050:
                             tuple_list=[(tech, sector,area, year, parameter),
                                             (tech,sector, area, 0, parameter),
                                             (tech, sector,0, year, parameter),
                                             (tech, sector,0, 0, parameter),
                                             (tech, 0, area, year, parameter),
                                             (tech, 0,0, year, parameter),
+                                            (tech, 0, area, 0, parameter),
                                             (tech, 0, 0, 0, parameter),
                                             (0,sector,0, year, parameter),
                                             (0, sector,0, 0, parameter),
+                                            (0, 0, 0, year, parameter),
                                             (0,0,0,0, parameter)]
-                        else:
+                        elif sector!="All" and year>2050:
+                            tuple_list=[(tech, sector,area, 2050, parameter),
+                                            (0, 0, 0, 2050, parameter),
+                                            (tech,sector, area, 0, parameter),
+                                            (tech, sector,0, 2050, parameter),
+                                            (tech, sector,0, 0, parameter),
+                                            (tech, 0, area, 2050, parameter),
+                                            (tech, 0,0, 2050, parameter),
+                                            (tech, 0, area, 0, parameter),
+                                            (tech, 0, 0, 0, parameter),
+                                            (0,sector,0, 2050, parameter),
+                                            (0, sector,0, 0, parameter),
+                                            (0,0,0,0, parameter)]
+
+                        elif sector=="All" and year<=2050:
                             tuple_list = [(tech, sector, area, year, parameter),
                                           (tech, sector, area, 0, parameter),
                                           (tech, sector, 0, year, parameter),
                                           (tech, sector, 0, 0, parameter),
                                           (0, sector, 0, year, parameter),
+                                          (0, sector, 0, 0, parameter)]
+
+                        else:
+                            tuple_list = [(tech, sector, area, 2050, parameter),
+                                          (tech, sector, area, 0, parameter),
+                                          (tech, sector, 0, 2050, parameter),
+                                          (tech, sector, 0, 0, parameter),
+                                          (0, sector, 0, 2050, parameter),
                                           (0, sector, 0, 0, parameter)]
                         for tuple_index in tuple_list:
 
@@ -323,7 +347,9 @@ def technologies_tech_type_sheet(df,tech_list,sector_list,year_list,areas_list,t
     return data.reset_index().pivot(index=["TECHNOLOGIES","TECH_TYPE","SECTOR","AREAS","YEAR"],columns="Parameter",values="Value")
 
 def sector_sheet(df,sector_list,year_list,areas_list):
-    parameter_list = ["carbon_tax","min_capture_ratio","max_capture_ratio","max_biogas_t","emissions_reduction_ratio_obj","co2_transport_and_storage_cost"]
+    parameter_list = ["carbon_tax","min_capture_ratio","max_capture_ratio","max_biogas_from_digester_t",
+                      "max_biogas_from_gasification_t","emissions_reduction_ratio_obj","co2_transport_and_storage_cost",
+                      "methane_leakage_ratio","olefins_carbone_storage_rate","methane_gwp"]
     data = []
     df2 = df
     df2[['SECTOR', 'AREAS', 'YEAR']] = df2[['SECTOR', 'AREAS', 'YEAR']].fillna(0)
@@ -373,7 +399,7 @@ def sector_sheet(df,sector_list,year_list,areas_list):
 
 
 def ccs_sheet(df, sector_list, year_list, areas_list, sector_tech_ccs_combinations):
-    parameter_list = ["ccs_lifetime", "ccs_ratio", "ccs_capex", "ccs_opex","ccs_discount_rate", "ccs_elec", "ccs_gas","ccs_force_install_ratio","ccs_force_capture_ratio"]
+    parameter_list = ["ccs_lifetime", "ccs_ratio", "ccs_capex", "ccs_opex","ccs_discount_rate", "ccs_elec", "ccs_gas","ccs_biomass","ccs_force_install_ratio","ccs_force_capture_ratio"]
     data = []
     # ccr_list = list(ccs_tech_combinations.keys())
     # try:
@@ -511,7 +537,14 @@ def sector_tech_ccs_combinations_fct(df,sector_list):
 
 def max_biogas_readjustment(df,available_potential_ratio):
     df1=df
-    df1["max_biogas_t"]=df1["max_biogas_t"].astype("float")*available_potential_ratio
+    df1["max_biogas_from_digester_t"]=df1["max_biogas_from_digester_t"].astype("float")*available_potential_ratio
+    df1["max_biogas_from_gasification_t"] = df1["max_biogas_from_gasification_t"].astype("float") * available_potential_ratio
+    return df1
+
+def biomass_waste_potential_readjustment(df,available_potential_ratio):
+    df1=df
+    df1.loc[(["Biomass_low_price","Biomass_med_price","Biomass_high_price","Municipal_wastes","Agriculture_wastes"],"All"),"max_capacity_t"]=\
+        df1.loc[(["Biomass_low_price","Biomass_med_price","Biomass_high_price","Municipal_wastes","Agriculture_wastes"],"All"),"max_capacity_t"].astype(float).interpolate(method="linear",limit_direction="forward") * available_potential_ratio
     return df1
 
 
